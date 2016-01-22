@@ -139,6 +139,12 @@ class BasicRequirements {
 			return new Error('Flow requires the PHP setting "session.auto_start" set to off.', 1224003190);
 		}
 
+		$memoryLimitStatus = $this->checkMemoryLimit();
+		if ( $memoryLimitStatus!==FALSE && $memoryLimitStatus!==TRUE ) {
+			return new Error($memoryLimitStatus);
+		}
+
+
 		return NULL;
 	}
 
@@ -163,4 +169,64 @@ class BasicRequirements {
 		}
 		return NULL;
 	}
+
+
+	/**
+	 * @return mixed
+	 */
+	protected function checkMemoryLimit() {
+		try {
+			$status = TRUE;
+
+			$minMemoryLimit = '128M';
+			$optMemoryLimit = '256M';
+
+			$webMemoryLimit = ini_get('memory_limit');
+			$cliMemoryLimit = NULL;
+
+			$output = array();
+			$return = array();
+			exec('php -r \'echo ini_get("memory_limit");\'', $output, $return);
+			if ($return === 0 && isset($output[0])) {
+				$cliMemoryLimit = $output[0];
+			}
+
+			if ($this->getPhpIniValueInBytes($webMemoryLimit) == $this->getPhpIniValueInBytes($cliMemoryLimit)) {
+				if ($this->getPhpIniValueInBytes($webMemoryLimit) < $this->getPhpIniValueInBytes($minMemoryLimit)) {
+					$status = 'You have too less Memory! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
+				}
+			} else {
+				$webStatus = $this->getPhpIniValueInBytes($webMemoryLimit) >= $this->getPhpIniValueInBytes($minMemoryLimit);
+				$cliStatus = $this->getPhpIniValueInBytes($cliMemoryLimit) >= $this->getPhpIniValueInBytes($minMemoryLimit);
+
+				if ( !$webStatus && !$cliStatus ) {
+					$status = 'You have too less Memory for your Web Server and CLI! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
+				}elseif( !$webStatus && $cliStatus ) {
+					$status = 'You have too less Memory for your Web Server! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
+				}elseif( $webStatus && !$cliStatus ) {
+					$status = 'You have too less Memory for your CLI! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
+				}
+			}
+		} catch (\Exception $exception) {
+			$status = FALSE;
+		}
+
+		return $status;
+	}
+
+	/**
+	 * @param string $value
+	 * @return int
+	 */
+	protected function getPhpIniValueInBytes($value) {
+		$value = trim($value);
+		$last = strtolower($value[strlen($value)-1]);
+		switch($last) {
+			case 'g':   $value *= 1024;
+			case 'm':   $value *= 1024;
+			case 'k':   $value *= 1024;
+		}
+		return $value;
+	}
+
 }
