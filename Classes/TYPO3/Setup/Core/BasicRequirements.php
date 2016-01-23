@@ -187,6 +187,7 @@ class BasicRequirements {
 			$optMemoryLimit = '256M';
 
 			$webMemoryLimit = ini_get('memory_limit');
+			$webMemoryLimit = $webMemoryLimit=='-1' ? '9999M' : $webMemoryLimit;
 			$cliMemoryLimit = NULL;
 
 			$output = array();
@@ -197,6 +198,7 @@ class BasicRequirements {
 			exec($command, $output, $return);
 			if ($return === 0 && isset($output[0])) {
 				$cliMemoryLimit = $output[0];
+				$cliMemoryLimit = $cliMemoryLimit=='-1' ? '9999M' : $cliMemoryLimit;
 			}
 
 			if ($this->getPhpIniValueInBytes($webMemoryLimit) == $this->getPhpIniValueInBytes($cliMemoryLimit)) {
