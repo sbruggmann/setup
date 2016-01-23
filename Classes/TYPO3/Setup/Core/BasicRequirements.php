@@ -13,6 +13,10 @@ namespace TYPO3\Setup\Core;
 
 use TYPO3\Flow\Annotations as Flow;
 use TYPO3\Flow\Error\Error;
+use TYPO3\Flow\Core\ApplicationContext;
+use TYPO3\Flow\Configuration\ConfigurationManager;
+use TYPO3\Flow\Core\Booting\Scripts;
+use TYPO3\Flow\Configuration\Source\YamlSource;
 
 /**
  * This class checks the basic requirements and returns an error object in case
@@ -178,6 +182,7 @@ class BasicRequirements {
 		try {
 			$status = TRUE;
 
+			$breakMemoryLimit = '96M';
 			$minMemoryLimit = '128M';
 			$optMemoryLimit = '256M';
 
@@ -186,25 +191,28 @@ class BasicRequirements {
 
 			$output = array();
 			$return = array();
-			exec('php -r \'echo ini_get("memory_limit");\'', $output, $return);
+
+			// todo: use configured or detected $phpBinaryPathAndFilename
+			$command = 'php -r \'echo ini_get("memory_limit");\'';
+			exec($command, $output, $return);
 			if ($return === 0 && isset($output[0])) {
 				$cliMemoryLimit = $output[0];
 			}
 
 			if ($this->getPhpIniValueInBytes($webMemoryLimit) == $this->getPhpIniValueInBytes($cliMemoryLimit)) {
-				if ($this->getPhpIniValueInBytes($webMemoryLimit) < $this->getPhpIniValueInBytes($minMemoryLimit)) {
+				if ($this->getPhpIniValueInBytes($webMemoryLimit) < $this->getPhpIniValueInBytes($breakMemoryLimit)) {
 					$status = 'You have too less Memory! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
 				}
 			} else {
-				$webStatus = $this->getPhpIniValueInBytes($webMemoryLimit) >= $this->getPhpIniValueInBytes($minMemoryLimit);
-				$cliStatus = $this->getPhpIniValueInBytes($cliMemoryLimit) >= $this->getPhpIniValueInBytes($minMemoryLimit);
+				$webStatus = $this->getPhpIniValueInBytes($webMemoryLimit) >= $this->getPhpIniValueInBytes($breakMemoryLimit);
+				$cliStatus = $this->getPhpIniValueInBytes($cliMemoryLimit) >= $this->getPhpIniValueInBytes($breakMemoryLimit);
 
 				if ( !$webStatus && !$cliStatus ) {
 					$status = 'You have too less Memory for your Web Server and CLI! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
 				}elseif( !$webStatus && $cliStatus ) {
 					$status = 'You have too less Memory for your Web Server! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
 				}elseif( $webStatus && !$cliStatus ) {
-					$status = 'You have too less Memory for your CLI! With ' . $webMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
+					$status = 'You have too less Memory for your CLI! With ' . $cliMemoryLimit . ' you will encounter problems. Raise the Memory Limit to at least ' . $minMemoryLimit . '. More than ' . $optMemoryLimit . ' would be even better.';
 				}
 			}
 		} catch (\Exception $exception) {
